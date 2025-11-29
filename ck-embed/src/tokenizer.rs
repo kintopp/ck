@@ -53,6 +53,11 @@ impl TokenEstimator {
             "jina-embeddings-v2-base-code" => 8192,
             "BAAI/bge-base-en-v1.5" => 512,
             "BAAI/bge-large-en-v1.5" => 512,
+            "intfloat/multilingual-e5-small" => 512,
+            "intfloat/multilingual-e5-base" => 512,
+            "intfloat/multilingual-e5-large" => 512,
+            "sentence-transformers/paraphrase-multilingual-mpnet-base-v2" => 128,
+            "lightonai/modernbert-embed-large" => 8192,
             _ => 8192, // Default to Nomic limit
         }
     }
@@ -148,6 +153,148 @@ fn main() {
             8192
         );
         assert_eq!(TokenEstimator::get_model_limit("unknown-model"), 8192);
+    }
+
+    // ============================================================
+    // Tests for new embedding models token limits
+    // ============================================================
+
+    #[test]
+    fn test_multilingual_e5_small_token_limit() {
+        assert_eq!(
+            TokenEstimator::get_model_limit("intfloat/multilingual-e5-small"),
+            512,
+            "multilingual-e5-small should have 512 token limit"
+        );
+    }
+
+    #[test]
+    fn test_multilingual_e5_base_token_limit() {
+        assert_eq!(
+            TokenEstimator::get_model_limit("intfloat/multilingual-e5-base"),
+            512,
+            "multilingual-e5-base should have 512 token limit"
+        );
+    }
+
+    #[test]
+    fn test_multilingual_e5_large_token_limit() {
+        assert_eq!(
+            TokenEstimator::get_model_limit("intfloat/multilingual-e5-large"),
+            512,
+            "multilingual-e5-large should have 512 token limit"
+        );
+    }
+
+    #[test]
+    fn test_paraphrase_multilingual_mpnet_token_limit() {
+        assert_eq!(
+            TokenEstimator::get_model_limit(
+                "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+            ),
+            128,
+            "paraphrase-multilingual-mpnet should have 128 token limit (per HuggingFace docs)"
+        );
+    }
+
+    #[test]
+    fn test_modernbert_embed_large_token_limit() {
+        assert_eq!(
+            TokenEstimator::get_model_limit("lightonai/modernbert-embed-large"),
+            8192,
+            "modernbert-embed-large should have 8192 token limit (8K context window)"
+        );
+    }
+
+    #[test]
+    fn test_multilingual_e5_models_have_512_limit() {
+        // E5 models have 512 token limit
+        let e5_models = [
+            "intfloat/multilingual-e5-small",
+            "intfloat/multilingual-e5-base",
+            "intfloat/multilingual-e5-large",
+        ];
+
+        for model in e5_models {
+            let limit = TokenEstimator::get_model_limit(model);
+            assert_eq!(
+                limit, 512,
+                "Model '{}' should have 512 token limit, got {}",
+                model, limit
+            );
+        }
+    }
+
+    #[test]
+    fn test_large_context_models() {
+        // Models with 8K+ context windows
+        let large_context_models = [
+            ("nomic-embed-text-v1", 8192),
+            ("nomic-embed-text-v1.5", 8192),
+            ("jina-embeddings-v2-base-code", 8192),
+            ("lightonai/modernbert-embed-large", 8192),
+        ];
+
+        for (model, expected_limit) in large_context_models {
+            let limit = TokenEstimator::get_model_limit(model);
+            assert_eq!(
+                limit, expected_limit,
+                "Model '{}' should have {} token limit, got {}",
+                model, expected_limit, limit
+            );
+        }
+    }
+
+    #[test]
+    fn test_small_context_models() {
+        // Models with small context windows
+        let small_context_models = [
+            (
+                "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
+                128,
+            ),
+            ("sentence-transformers/all-MiniLM-L6-v2", 512),
+            ("BAAI/bge-small-en-v1.5", 512),
+        ];
+
+        for (model, expected_limit) in small_context_models {
+            let limit = TokenEstimator::get_model_limit(model);
+            assert_eq!(
+                limit, expected_limit,
+                "Model '{}' should have {} token limit, got {}",
+                model, expected_limit, limit
+            );
+        }
+    }
+
+    #[test]
+    fn test_existing_models_still_work() {
+        // Ensure existing models still have correct limits after changes
+        assert_eq!(
+            TokenEstimator::get_model_limit("BAAI/bge-small-en-v1.5"),
+            512
+        );
+        assert_eq!(
+            TokenEstimator::get_model_limit("sentence-transformers/all-MiniLM-L6-v2"),
+            512
+        );
+        assert_eq!(TokenEstimator::get_model_limit("nomic-embed-text-v1"), 8192);
+        assert_eq!(
+            TokenEstimator::get_model_limit("nomic-embed-text-v1.5"),
+            8192
+        );
+        assert_eq!(
+            TokenEstimator::get_model_limit("jina-embeddings-v2-base-code"),
+            8192
+        );
+        assert_eq!(
+            TokenEstimator::get_model_limit("BAAI/bge-base-en-v1.5"),
+            512
+        );
+        assert_eq!(
+            TokenEstimator::get_model_limit("BAAI/bge-large-en-v1.5"),
+            512
+        );
     }
 
     #[test]

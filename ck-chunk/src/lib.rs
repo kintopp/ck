@@ -34,6 +34,23 @@ pub fn get_model_chunk_config(model_name: Option<&str>) -> (usize, usize) {
             (400, 80) // 400 tokens target, 80 token overlap (~20%)
         }
 
+        // Multilingual E5 models - same as BGE for precision
+        "intfloat/multilingual-e5-small"
+        | "intfloat/multilingual-e5-base"
+        | "intfloat/multilingual-e5-large" => {
+            (400, 80) // 400 tokens target, 80 token overlap (~20%)
+        }
+
+        // Paraphrase multilingual - only 128 token max, use smaller chunks
+        "sentence-transformers/paraphrase-multilingual-mpnet-base-v2" => {
+            (100, 20) // 100 tokens target, 20 token overlap (~20%) - fits 128 max
+        }
+
+        // ModernBERT - 8K context window, can use larger chunks like nomic/jina
+        "lightonai/modernbert-embed-large" => {
+            (1024, 200) // 1024 tokens target, 200 token overlap (~20%)
+        }
+
         // Default to large model config since nomic-v1.5 is default
         _ => (1024, 200), // Good balance of context vs precision
     }
@@ -2444,5 +2461,234 @@ fibonacci n = fibonacci (n - 1) + fibonacci (n - 2)
             fac.text.contains("factorial n = n * factorial (n - 1)"),
             "Should include recursive case"
         );
+    }
+
+    // ============================================================
+    // Tests for new embedding models chunk configuration
+    // ============================================================
+
+    #[test]
+    fn test_multilingual_e5_small_chunk_config() {
+        let (target_tokens, overlap_tokens) =
+            get_model_chunk_config(Some("intfloat/multilingual-e5-small"));
+
+        assert_eq!(
+            target_tokens, 400,
+            "multilingual-e5-small should use 400 token chunks"
+        );
+        assert_eq!(
+            overlap_tokens, 80,
+            "multilingual-e5-small should use 80 token overlap"
+        );
+    }
+
+    #[test]
+    fn test_multilingual_e5_base_chunk_config() {
+        let (target_tokens, overlap_tokens) =
+            get_model_chunk_config(Some("intfloat/multilingual-e5-base"));
+
+        assert_eq!(
+            target_tokens, 400,
+            "multilingual-e5-base should use 400 token chunks"
+        );
+        assert_eq!(
+            overlap_tokens, 80,
+            "multilingual-e5-base should use 80 token overlap"
+        );
+    }
+
+    #[test]
+    fn test_multilingual_e5_large_chunk_config() {
+        let (target_tokens, overlap_tokens) =
+            get_model_chunk_config(Some("intfloat/multilingual-e5-large"));
+
+        assert_eq!(
+            target_tokens, 400,
+            "multilingual-e5-large should use 400 token chunks"
+        );
+        assert_eq!(
+            overlap_tokens, 80,
+            "multilingual-e5-large should use 80 token overlap"
+        );
+    }
+
+    #[test]
+    fn test_paraphrase_multilingual_mpnet_chunk_config() {
+        let (target_tokens, overlap_tokens) = get_model_chunk_config(Some(
+            "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
+        ));
+
+        // Only 128 token max, so use very small chunks
+        assert_eq!(
+            target_tokens, 100,
+            "paraphrase-multilingual-mpnet should use 100 token chunks (128 max context)"
+        );
+        assert_eq!(
+            overlap_tokens, 20,
+            "paraphrase-multilingual-mpnet should use 20 token overlap"
+        );
+    }
+
+    #[test]
+    fn test_modernbert_embed_large_chunk_config() {
+        let (target_tokens, overlap_tokens) =
+            get_model_chunk_config(Some("lightonai/modernbert-embed-large"));
+
+        // 8K context window - can use larger chunks like nomic/jina
+        assert_eq!(
+            target_tokens, 1024,
+            "modernbert-embed-large should use 1024 token chunks (8K context window)"
+        );
+        assert_eq!(
+            overlap_tokens, 200,
+            "modernbert-embed-large should use 200 token overlap"
+        );
+    }
+
+    #[test]
+    fn test_multilingual_e5_models_use_small_chunks() {
+        // E5 models have 512 token limits - use smaller chunks for precision
+        let e5_models = [
+            "intfloat/multilingual-e5-small",
+            "intfloat/multilingual-e5-base",
+            "intfloat/multilingual-e5-large",
+        ];
+
+        for model in e5_models {
+            let (target_tokens, overlap_tokens) = get_model_chunk_config(Some(model));
+
+            assert_eq!(
+                target_tokens, 400,
+                "Model '{}' should use 400 token chunks",
+                model
+            );
+            assert_eq!(
+                overlap_tokens, 80,
+                "Model '{}' should use 80 token overlap",
+                model
+            );
+
+            // Verify ~20% overlap ratio
+            let overlap_ratio = overlap_tokens as f32 / target_tokens as f32;
+            assert!(
+                (overlap_ratio - 0.2).abs() < 0.01,
+                "Model '{}' overlap ratio should be ~20%, got {}",
+                model,
+                overlap_ratio
+            );
+        }
+    }
+
+    #[test]
+    fn test_large_context_models_use_larger_chunks() {
+        // Models with 8K+ context can use larger chunks
+        let large_context_models = [
+            "nomic-embed-text-v1.5",
+            "jina-embeddings-v2-base-code",
+            "lightonai/modernbert-embed-large",
+        ];
+
+        for model in large_context_models {
+            let (target_tokens, overlap_tokens) = get_model_chunk_config(Some(model));
+
+            assert_eq!(
+                target_tokens, 1024,
+                "Model '{}' should use 1024 token chunks (large context)",
+                model
+            );
+            assert_eq!(
+                overlap_tokens, 200,
+                "Model '{}' should use 200 token overlap",
+                model
+            );
+        }
+    }
+
+    #[test]
+    fn test_existing_models_chunk_config_unchanged() {
+        // Verify existing model configs haven't changed
+        let (target, overlap) = get_model_chunk_config(Some("BAAI/bge-small-en-v1.5"));
+        assert_eq!(target, 400);
+        assert_eq!(overlap, 80);
+
+        let (target, overlap) =
+            get_model_chunk_config(Some("sentence-transformers/all-MiniLM-L6-v2"));
+        assert_eq!(target, 400);
+        assert_eq!(overlap, 80);
+
+        // Large context models should still use larger chunks
+        let (target, overlap) = get_model_chunk_config(Some("nomic-embed-text-v1.5"));
+        assert_eq!(target, 1024);
+        assert_eq!(overlap, 200);
+
+        let (target, overlap) = get_model_chunk_config(Some("jina-embeddings-v2-base-code"));
+        assert_eq!(target, 1024);
+        assert_eq!(overlap, 200);
+    }
+
+    #[test]
+    fn test_chunk_text_with_new_models() {
+        // Test that chunking works with new model configurations
+        let test_code = r#"
+fn hello() {
+    println!("Hello, world!");
+}
+
+fn goodbye() {
+    println!("Goodbye, world!");
+}
+"#;
+
+        // Models with their max token limits for validation
+        let new_models_with_limits = [
+            ("intfloat/multilingual-e5-small", 512),
+            ("intfloat/multilingual-e5-base", 512),
+            ("intfloat/multilingual-e5-large", 512),
+            (
+                "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
+                128,
+            ),
+            ("lightonai/modernbert-embed-large", 8192),
+        ];
+
+        for (model, max_tokens) in new_models_with_limits {
+            let result =
+                chunk_text_with_model(test_code, Some(ck_core::Language::Rust), Some(model));
+
+            assert!(
+                result.is_ok(),
+                "Chunking with model '{}' should succeed",
+                model
+            );
+
+            let chunks = result.unwrap();
+            assert!(
+                !chunks.is_empty(),
+                "Chunking with model '{}' should produce chunks",
+                model
+            );
+
+            // Verify chunks respect model's token limit (with buffer for striding)
+            let limit_with_buffer = max_tokens + (max_tokens / 4); // 25% buffer
+            for chunk in &chunks {
+                assert!(
+                    chunk.metadata.estimated_tokens <= limit_with_buffer,
+                    "Chunk from model '{}' has {} tokens, should be <= {} (model max: {})",
+                    model,
+                    chunk.metadata.estimated_tokens,
+                    limit_with_buffer,
+                    max_tokens
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_default_config_uses_nomic() {
+        // Default config (None) should use nomic-v1.5 settings
+        let (target_tokens, overlap_tokens) = get_model_chunk_config(None);
+
+        assert_eq!(target_tokens, 1024, "Default should use 1024 token chunks");
+        assert_eq!(overlap_tokens, 200, "Default should use 200 token overlap");
     }
 }

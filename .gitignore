@@ -34,3 +34,6 @@ docs-site/.vitepress/.temp
 
 # Claude Code local settings
 .claude/
+
+# Semantic grep tool cache
+.osgrep/

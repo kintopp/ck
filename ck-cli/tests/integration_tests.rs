@@ -821,3 +821,112 @@ fn test_add_file_with_relative_path() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(stdout.contains("Relative path content"));
 }
+
+// ============================================================
+// Integration tests for new embedding models
+// ============================================================
+
+/// Test that new models can be selected with --model flag
+/// Note: This test doesn't download the models, just verifies the flag is accepted
+#[test]
+#[serial]
+fn test_model_flag_accepts_new_models() {
+    let temp_dir = TempDir::new().unwrap();
+    fs::write(
+        temp_dir.path().join("test.txt"),
+        "Hello world in multiple languages",
+    )
+    .unwrap();
+
+    let new_models = [
+        "multilingual-e5-small",
+        "multilingual-e5-base",
+        "multilingual-e5-large",
+        "paraphrase-multilingual-mpnet",
+        "modernbert-large",
+    ];
+
+    for model in new_models {
+        // Test that --model flag is accepted (even if model download fails)
+        let output = Command::new(ck_binary())
+            .args(["--model", model, "--index", "."])
+            .current_dir(temp_dir.path())
+            .output()
+            .unwrap_or_else(|_| panic!("Failed to run ck with --model {}", model));
+
+        // We're just checking the flag is accepted - model download may fail in test env
+        // but the flag should be recognized
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            !stderr.contains("error: invalid value") && !stderr.contains("isn't a valid value"),
+            "Model '{}' should be accepted by --model flag. Stderr: {}",
+            model,
+            stderr
+        );
+    }
+}
+
+/// Test switch-model with new models (validates model name recognition)
+#[test]
+#[serial]
+fn test_switch_model_recognizes_new_models() {
+    let temp_dir = TempDir::new().unwrap();
+    fs::write(temp_dir.path().join("test.txt"), "test content").unwrap();
+
+    // First create an index with default model
+    let status = Command::new(ck_binary())
+        .args(["--index", "."])
+        .current_dir(temp_dir.path())
+        .status()
+        .expect("ck --index should run");
+
+    assert!(status.success());
+
+    // Try switching to a new model (will rebuild index)
+    let output = Command::new(ck_binary())
+        .args(["--switch-model", "multilingual-e5-base"])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("ck --switch-model should run");
+
+    // Check the model name was recognized (even if download fails)
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !stderr.contains("Unknown model")
+            && !stderr.contains("error: invalid value")
+            && !stderr.contains("isn't a valid value"),
+        "Model 'multilingual-e5-base' should be recognized. Stderr: {}",
+        stderr
+    );
+}
+
+/// Test that model validation works for invalid models
+#[test]
+fn test_invalid_model_rejected() {
+    let temp_dir = TempDir::new().unwrap();
+    fs::write(temp_dir.path().join("test.txt"), "test content").unwrap();
+
+    let output = Command::new(ck_binary())
+        .args(["--model", "definitely-not-a-real-model-xyz", "--index", "."])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("ck should run");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Either the command fails or shows an error about unknown model
+    // (implementation may vary)
+    assert!(
+        !output.status.success()
+            || stderr.contains("unknown")
+            || stderr.contains("Unknown")
+            || stderr.contains("not found")
+            || stdout.contains("unknown")
+            || stdout.contains("Unknown"),
+        "Invalid model should be rejected or warn. Status: {:?}, Stderr: {}, Stdout: {}",
+        output.status,
+        stderr,
+        stdout
+    );
+}

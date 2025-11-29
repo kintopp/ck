@@ -123,6 +123,17 @@ impl FastEmbedder {
             "BAAI/bge-base-en-v1.5" => EmbeddingModel::BGEBaseENV15,
             "BAAI/bge-large-en-v1.5" => EmbeddingModel::BGELargeENV15,
 
+            // Multilingual models
+            "intfloat/multilingual-e5-small" => EmbeddingModel::MultilingualE5Small,
+            "intfloat/multilingual-e5-base" => EmbeddingModel::MultilingualE5Base,
+            "intfloat/multilingual-e5-large" => EmbeddingModel::MultilingualE5Large,
+            "sentence-transformers/paraphrase-multilingual-mpnet-base-v2" => {
+                EmbeddingModel::ParaphraseMLMpnetBaseV2
+            }
+
+            // Modern architecture
+            "lightonai/modernbert-embed-large" => EmbeddingModel::ModernBertEmbedLarge,
+
             // Default to Nomic v1.5 for better performance
             _ => EmbeddingModel::NomicEmbedTextV15,
         };
@@ -160,6 +171,17 @@ impl FastEmbedder {
             // BGE large can handle more
             EmbeddingModel::BGELargeENV15 => 512, // Conservative for BGE
 
+            // Multilingual E5 models
+            EmbeddingModel::MultilingualE5Small
+            | EmbeddingModel::MultilingualE5Base
+            | EmbeddingModel::MultilingualE5Large => 512,
+
+            // Paraphrase multilingual
+            EmbeddingModel::ParaphraseMLMpnetBaseV2 => 512,
+
+            // Modern architecture
+            EmbeddingModel::ModernBertEmbedLarge => 512,
+
             _ => 512, // Safe default
         };
 
@@ -178,15 +200,20 @@ impl FastEmbedder {
             // Small models (384 dimensions)
             EmbeddingModel::BGESmallENV15 => 384,
             EmbeddingModel::AllMiniLML6V2 => 384,
+            EmbeddingModel::MultilingualE5Small => 384,
 
-            // Large context models (768 dimensions)
+            // Medium models (768 dimensions)
             EmbeddingModel::NomicEmbedTextV1 => 768,
             EmbeddingModel::NomicEmbedTextV15 => 768,
             EmbeddingModel::JinaEmbeddingsV2BaseCode => 768,
             EmbeddingModel::BGEBaseENV15 => 768,
+            EmbeddingModel::MultilingualE5Base => 768,
+            EmbeddingModel::ParaphraseMLMpnetBaseV2 => 768,
 
             // Large models (1024 dimensions)
             EmbeddingModel::BGELargeENV15 => 1024,
+            EmbeddingModel::MultilingualE5Large => 1024,
+            EmbeddingModel::ModernBertEmbedLarge => 1024,
 
             _ => 384, // Default to 384 for BGE default
         };
@@ -374,6 +401,214 @@ mod tests {
         assert_eq!(embeddings.len(), 3);
         for embedding in &embeddings {
             assert_eq!(embedding.len(), 384);
+        }
+    }
+
+    // ============================================================
+    // Tests for new embedding models (multilingual and modernbert)
+    // ============================================================
+
+    /// Test that all new model names are recognized and map to correct dimensions
+    #[cfg(feature = "fastembed")]
+    mod fastembed_model_tests {
+        use super::*;
+
+        /// Test multilingual-e5-small model configuration
+        #[test]
+        #[ignore = "requires model download"]
+        fn test_multilingual_e5_small_model() {
+            let embedder = FastEmbedder::new("intfloat/multilingual-e5-small");
+            match embedder {
+                Ok(mut embedder) => {
+                    assert_eq!(embedder.dim(), 384);
+                    assert_eq!(embedder.model_name(), "intfloat/multilingual-e5-small");
+
+                    // Test embedding works
+                    let texts = vec!["test text".to_string()];
+                    let result = embedder.embed(&texts);
+                    assert!(result.is_ok());
+                    let embeddings = result.unwrap();
+                    assert_eq!(embeddings.len(), 1);
+                    assert_eq!(embeddings[0].len(), 384);
+                }
+                Err(e) => {
+                    // Model download may fail in test environment
+                    eprintln!("Skipping test (model unavailable): {}", e);
+                }
+            }
+        }
+
+        /// Test multilingual-e5-base model configuration
+        #[test]
+        #[ignore = "requires model download"]
+        fn test_multilingual_e5_base_model() {
+            let embedder = FastEmbedder::new("intfloat/multilingual-e5-base");
+            match embedder {
+                Ok(mut embedder) => {
+                    assert_eq!(embedder.dim(), 768);
+                    assert_eq!(embedder.model_name(), "intfloat/multilingual-e5-base");
+
+                    // Test embedding works
+                    let texts = vec!["test text".to_string()];
+                    let result = embedder.embed(&texts);
+                    assert!(result.is_ok());
+                    let embeddings = result.unwrap();
+                    assert_eq!(embeddings.len(), 1);
+                    assert_eq!(embeddings[0].len(), 768);
+                }
+                Err(e) => {
+                    eprintln!("Skipping test (model unavailable): {}", e);
+                }
+            }
+        }
+
+        /// Test multilingual-e5-large model configuration
+        #[test]
+        #[ignore = "requires model download"]
+        fn test_multilingual_e5_large_model() {
+            let embedder = FastEmbedder::new("intfloat/multilingual-e5-large");
+            match embedder {
+                Ok(mut embedder) => {
+                    assert_eq!(embedder.dim(), 1024);
+                    assert_eq!(embedder.model_name(), "intfloat/multilingual-e5-large");
+
+                    // Test embedding works
+                    let texts = vec!["test text".to_string()];
+                    let result = embedder.embed(&texts);
+                    assert!(result.is_ok());
+                    let embeddings = result.unwrap();
+                    assert_eq!(embeddings.len(), 1);
+                    assert_eq!(embeddings[0].len(), 1024);
+                }
+                Err(e) => {
+                    eprintln!("Skipping test (model unavailable): {}", e);
+                }
+            }
+        }
+
+        /// Test paraphrase-multilingual-mpnet model configuration
+        #[test]
+        #[ignore = "requires model download"]
+        fn test_paraphrase_multilingual_mpnet_model() {
+            let embedder =
+                FastEmbedder::new("sentence-transformers/paraphrase-multilingual-mpnet-base-v2");
+            match embedder {
+                Ok(mut embedder) => {
+                    assert_eq!(embedder.dim(), 768);
+                    assert_eq!(
+                        embedder.model_name(),
+                        "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+                    );
+
+                    // Test embedding works
+                    let texts = vec!["test text".to_string()];
+                    let result = embedder.embed(&texts);
+                    assert!(result.is_ok());
+                    let embeddings = result.unwrap();
+                    assert_eq!(embeddings.len(), 1);
+                    assert_eq!(embeddings[0].len(), 768);
+                }
+                Err(e) => {
+                    eprintln!("Skipping test (model unavailable): {}", e);
+                }
+            }
+        }
+
+        /// Test modernbert-embed-large model configuration
+        #[test]
+        #[ignore = "requires model download"]
+        fn test_modernbert_embed_large_model() {
+            let embedder = FastEmbedder::new("lightonai/modernbert-embed-large");
+            match embedder {
+                Ok(mut embedder) => {
+                    assert_eq!(embedder.dim(), 1024);
+                    assert_eq!(embedder.model_name(), "lightonai/modernbert-embed-large");
+
+                    // Test embedding works
+                    let texts = vec!["test text".to_string()];
+                    let result = embedder.embed(&texts);
+                    assert!(result.is_ok());
+                    let embeddings = result.unwrap();
+                    assert_eq!(embeddings.len(), 1);
+                    assert_eq!(embeddings[0].len(), 1024);
+                }
+                Err(e) => {
+                    eprintln!("Skipping test (model unavailable): {}", e);
+                }
+            }
+        }
+
+        /// Test that multilingual models can handle non-ASCII text
+        #[test]
+        #[ignore = "requires model download"]
+        fn test_multilingual_model_non_ascii() {
+            let embedder = FastEmbedder::new("intfloat/multilingual-e5-base");
+            match embedder {
+                Ok(mut embedder) => {
+                    // Test with text in different languages
+                    let texts = vec![
+                        "Hello, world!".to_string(),     // English
+                        "Bonjour le monde!".to_string(), // French
+                        "Hallo Welt!".to_string(),       // German
+                        "¡Hola mundo!".to_string(),      // Spanish
+                        "こんにちは世界！".to_string(),  // Japanese
+                        "你好，世界！".to_string(),      // Chinese
+                        "Привет мир!".to_string(),       // Russian
+                    ];
+
+                    let result = embedder.embed(&texts);
+                    assert!(result.is_ok(), "Should handle multilingual text");
+
+                    let embeddings = result.unwrap();
+                    assert_eq!(embeddings.len(), texts.len());
+
+                    // All embeddings should have correct dimensions
+                    for (i, embedding) in embeddings.iter().enumerate() {
+                        assert_eq!(
+                            embedding.len(),
+                            768,
+                            "Embedding {} should have 768 dimensions",
+                            i
+                        );
+
+                        // Embeddings should not be all zeros
+                        assert!(
+                            !embedding.iter().all(|&x| x == 0.0),
+                            "Embedding {} should not be all zeros",
+                            i
+                        );
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Skipping test (model unavailable): {}", e);
+                }
+            }
+        }
+
+        /// Test that create_embedder works with new model names
+        #[test]
+        #[ignore = "requires model download"]
+        fn test_create_embedder_with_new_models() {
+            let model_names = [
+                "intfloat/multilingual-e5-small",
+                "intfloat/multilingual-e5-base",
+                "intfloat/multilingual-e5-large",
+                "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
+                "lightonai/modernbert-embed-large",
+            ];
+
+            for model_name in model_names {
+                let result = create_embedder(Some(model_name));
+                match result {
+                    Ok(embedder) => {
+                        assert_eq!(embedder.id(), "fastembed");
+                        assert_eq!(embedder.model_name(), model_name);
+                    }
+                    Err(e) => {
+                        eprintln!("Skipping {} (model unavailable): {}", model_name, e);
+                    }
+                }
+            }
         }
     }
 }

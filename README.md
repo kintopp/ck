@@ -249,12 +249,27 @@ ck --index --model nomic-v1.5 .
 
 # Code-specialized: Jina Code (optimized for programming languages)
 ck --index --model jina-code .
+
+# Multilingual: E5 models (100+ languages for non-English text)
+ck --index --model multilingual-e5-base docs/
+ck --index --model multilingual-e5-large docs/  # Higher quality
+
+# Modern architecture: Latest BERT improvements
+ck --index --model modernbert-large .
 ```
 
 **Model Comparison:**
-- **`bge-small`** (default): 400-token chunks, fast indexing, good for most code
-- **`nomic-v1.5`**: 1024-token chunks with 8K model capacity, better for large functions
-- **`jina-code`**: 1024-token chunks with 8K model capacity, specialized for code understanding
+
+| Model | Dimensions | Context | Languages | Use Case |
+|-------|-----------|---------|-----------|----------|
+| `bge-small` (default) | 384 | 512 | English | Fast indexing, good for most code |
+| `nomic-v1.5` | 768 | 8192 | English | Large functions, 8K context |
+| `jina-code` | 768 | 8192 | Code | Code-specialized, 8K context |
+| **`multilingual-e5-small`** | 384 | 512 | **100+** | **Fast multilingual search** |
+| **`multilingual-e5-base`** | 768 | 512 | **100+** | **Balanced multilingual (recommended)** |
+| **`multilingual-e5-large`** | 1024 | 512 | **100+** | **Best multilingual quality** |
+| **`paraphrase-multilingual-mpnet`** | 768 | 128 | **50+** | **Multilingual paraphrasing & semantic similarity** |
+| **`modernbert-large`** | 1024 | 8192 | English | **Modern BERT architecture, 8K context, improved quality** |
 
 ### Index Management
 
@@ -320,6 +335,34 @@ apt install ck-search      # 🚧 In development
 ```
 
 ## 💡 Examples
+
+### Multilingual Search
+
+Search documents in 100+ languages using multilingual models:
+
+```bash
+# Index multilingual documentation
+ck --index --model multilingual-e5-base docs/
+
+# Search Spanish documents
+ck --model multilingual-e5-base --sem "autenticación de usuario" docs/es/
+ck --model multilingual-e5-base --sem "manejo de errores" docs/es/
+
+# Search French documents
+ck --model multilingual-e5-base --sem "validation des données" docs/fr/
+
+# Search Chinese documentation
+ck --model multilingual-e5-base --sem "错误处理" docs/zh/
+ck --model multilingual-e5-base --sem "用户认证" docs/zh/
+
+# Search German code comments
+ck --model multilingual-e5-base --sem "Fehlerbehandlung" src/
+
+# Mixed-language repositories
+ck --model multilingual-e5-large --sem "database connection" .
+```
+
+**Supported Languages:** Arabic, Bengali, Chinese, Dutch, English, French, German, Hindi, Indonesian, Italian, Japanese, Korean, Polish, Portuguese, Russian, Spanish, Thai, Turkish, Vietnamese, and 80+ more.
 
 ### Finding Code Patterns
 ```bash
